@@ -1,10 +1,17 @@
 #include <iostream>
 #include <fstream>
+#include <string>
+#include <iomanip>
+
 using namespace std;
 
+const string LINE = "============================================================";
+const string DASH = "------------------------------------------------------------";
 
 
-
+// ============================================================
+// HUFFMAN NODE
+// ============================================================
 
 struct HuffmanNode
 {
@@ -24,7 +31,9 @@ struct HuffmanNode
 };
 
 
-
+// ============================================================
+// PRIORITY QUEUE (sorted by frequency, lowest first)
+// ============================================================
 
 struct PriorityQueue
 {
@@ -53,12 +62,6 @@ struct PriorityQueue
         }
     }
 
-
-
-
-
-
-
     HuffmanNode* dequeue()
     {
         if (size == 0)
@@ -80,95 +83,99 @@ struct PriorityQueue
 };
 
 
+// ============================================================
+// FEATURE 1 & 2: READ TEXT FILE + CHARACTER FREQUENCY ANALYSIS
+// ============================================================
 
+bool readFrequencies(string filename, int frequency[])
+{
+    ifstream file(filename.c_str(), ios::binary);
 
+    if (!file)
+    {
+        return false;
+    }
 
+    char ch;
 
+    while (file.get(ch))
+    {
+        frequency[(unsigned char)ch]++;
+    }
 
+    file.close();
+    return true;
+}
+
+// Readable label for a character (used by both tables)
+string charLabel(int i)
+{
+    if (i == ' ')  return "[SPACE]";
+    if (i == '\n') return "[NEWLINE]";
+    if (i == '\r') return "[CR]";
+    if (i == '\t') return "[TAB]";
+
+    if (i < 32 || i > 126)
+    {
+        return "[ASCII " + to_string(i) + "]";
+    }
+
+    return string("'") + char(i) + "'";
+}
 
 void displayFrequencies(int frequency[])
 {
-    cout << "\nCharacter Frequencies\n";
-    cout << "---------------------\n";
+    cout << "\n" << LINE << "\n";
+    cout << "                 CHARACTER FREQUENCIES\n";
+    cout << LINE << "\n";
+
+    cout << left << setw(20) << "Character"
+         << right << setw(15) << "Frequency" << endl;
+    cout << DASH << "\n";
 
     for (int i = 0; i < 256; i++)
     {
         if (frequency[i] > 0)
         {
-            if (i == ' ')
-            {
-                cout << "[SPACE]";
-            }
-            else if (i == '\n')
-            {
-                cout << "[NEWLINE]";
-            }
-            else
-            {
-                cout << "'" << char(i) << "'";
-            }
-
-            cout << " : " << frequency[i] << endl;
+            cout << left << setw(20) << charLabel(i)
+                 << right << setw(15) << frequency[i] << endl;
         }
     }
+
+    cout << LINE << "\n";
 }
 
 
+// ============================================================
+// FEATURE 3: HUFFMAN TREE CONSTRUCTION
+// Used by BOTH compression and decompression, so the two sides
+// always build exactly the same tree.
+// ============================================================
 
-
-
-
-
-
-void displayTree(HuffmanNode* root, string code)
+HuffmanNode* buildHuffmanTree(int frequency[])
 {
-    if (root == NULL)
+    PriorityQueue queue;
+
+    for (int i = 0; i < 256; i++)
     {
-        return;
+        if (frequency[i] > 0)
+        {
+            queue.enqueue(new HuffmanNode(char(i), frequency[i]));
+        }
     }
 
-    if (root->left == NULL && root->right == NULL)
+    if (queue.size == 0)
     {
-        if (root->data == ' ')
-        {
-            cout << "[SPACE]";
-        }
-        else if (root->data == '\n')
-        {
-            cout << "[NEWLINE]";
-        }
-        else
-        {
-            cout << root->data;
-        }
-
-        cout << " : " << root->frequency << endl;
-
-        return;
+        return NULL;
     }
 
-
-
-
-
-
-
-
-    displayTree(root->left, code + "0");
-    displayTree(root->right, code + "1");
-}
-
-HuffmanNode* buildHuffmanTree(PriorityQueue& queue)
-{
     while (queue.size > 1)
     {
         HuffmanNode* first = queue.dequeue();
         HuffmanNode* second = queue.dequeue();
 
-        HuffmanNode* newNode = new HuffmanNode(
-            '\0',
-            first->frequency + second->frequency
-        );
+        HuffmanNode* newNode =
+            new HuffmanNode('\0', first->frequency + second->frequency);
 
         newNode->left = first;
         newNode->right = second;
@@ -179,100 +186,510 @@ HuffmanNode* buildHuffmanTree(PriorityQueue& queue)
     return queue.dequeue();
 }
 
-
-
-
-
-
-
-
-int main()
+void deleteTree(HuffmanNode* root)
 {
-    ifstream file("Ratfiles.txt");
-    if (!file)
+    if (root == NULL)
     {
-        cout << "Error: Ratfiles.txt not found." << endl;
-        return 1;
+        return;
     }
 
-    int frequency[256] = {0};
-    char ch;
-    while (file.get(ch))
+    deleteTree(root->left);
+    deleteTree(root->right);
+    delete root;
+}
+
+
+// ============================================================
+// FEATURE 4: HUFFMAN CODE GENERATION
+// ============================================================
+
+void createBinaryCodes(HuffmanNode* root, string code, string codes[])
+{
+    if (root == NULL)
     {
-        frequency[(unsigned char)ch]++;
+        return;
     }
-    file.close();
 
+    // Leaf node
+    if (root->left == NULL && root->right == NULL)
+    {
+        codes[(unsigned char)root->data] = code.empty() ? "0" : code;
+        return;
+    }
 
-    cout << "____________________________" << endl;
-    cout << "=== HUFFMAN CODING PROJECT ===" << endl;
-    cout << "____________________________" << endl;
+    createBinaryCodes(root->left, code + "0", codes);
+    createBinaryCodes(root->right, code + "1", codes);
+}
 
-    cout << "\nFile read successfully." << endl;
+void displayBinaryCodes(int frequency[], string codes[])
+{
+    cout << "\n" << LINE << "\n";
+    cout << "                    HUFFMAN CODES\n";
+    cout << LINE << "\n";
 
-    displayFrequencies(frequency);
-
-    PriorityQueue queue;
+    cout << left << setw(20) << "Character"
+         << right << setw(15) << "Frequency"
+         << setw(20) << "Huffman Code" << endl;
+    cout << DASH << "\n";
 
     for (int i = 0; i < 256; i++)
     {
         if (frequency[i] > 0)
         {
-            HuffmanNode* newNode =
-                new HuffmanNode(char(i), frequency[i]);
-
-            queue.enqueue(newNode);
+            cout << left << setw(20) << charLabel(i)
+                 << right << setw(15) << frequency[i]
+                 << setw(20) << codes[i] << endl;
         }
     }
 
-    if (queue.size == 0)
+    cout << LINE << "\n";
+}
+
+
+// ============================================================
+// FEATURE 5: FILE COMPRESSION
+//
+// Compressed file format:
+//   int         number of unique characters
+//   repeated:   1 byte character + int frequency
+//   long long   number of valid bits
+//   bytes       the Huffman bits packed 8 per byte
+// ============================================================
+
+bool compressFile(string inputFile, string outputFile,
+                  string codes[], int frequency[])
+{
+    ifstream file(inputFile.c_str(), ios::binary);
+
+    if (!file)
     {
-        cout << "\nThe file is empty." << endl;
-        return 0;
+        cout << "Error: Could not open input file." << endl;
+        return false;
     }
 
-    HuffmanNode* root = buildHuffmanTree(queue);
+    ofstream compressed(outputFile.c_str(), ios::binary);
 
-    cout << "\nHuffman Tree created successfully." << endl;
+    if (!compressed)
+    {
+        cout << "Error: Could not create compressed file." << endl;
+        return false;
+    }
 
-    cout << "\nTree Characters:" << endl;
-    cout << "----------------" << endl;
+    // ---- Header: frequency table ----
+    int uniqueCharacters = 0;
 
-    displayTree(root, "");
+    for (int i = 0; i < 256; i++)
+    {
+        if (frequency[i] > 0)
+        {
+            uniqueCharacters++;
+        }
+    }
+
+    compressed.write((char*)&uniqueCharacters, sizeof(uniqueCharacters));
+
+    for (int i = 0; i < 256; i++)
+    {
+        if (frequency[i] > 0)
+        {
+            unsigned char character = (unsigned char)i;
+
+            compressed.write((char*)&character, sizeof(character));
+            compressed.write((char*)&frequency[i], sizeof(frequency[i]));
+        }
+    }
+
+    // ---- Convert the text into Huffman bits ----
+    string bits = "";
+    char ch;
+
+    while (file.get(ch))
+    {
+        bits += codes[(unsigned char)ch];
+    }
+
+    file.close();
+
+    long long validBits = (long long)bits.length();
+
+    compressed.write((char*)&validBits, sizeof(validBits));
+
+    // ---- Pack every 8 bits into one byte ----
+    for (size_t i = 0; i < bits.length(); i += 8)
+    {
+        unsigned char byte = 0;
+
+        for (size_t j = 0; j < 8; j++)
+        {
+            if (i + j < bits.length() && bits[i + j] == '1')
+            {
+                byte |= (1 << (7 - j));
+            }
+        }
+
+        compressed.write((char*)&byte, sizeof(byte));
+    }
+
+    compressed.close();
+
+    cout << "\nTotal Encoded Bits : " << validBits << endl;
+    return true;
+}
 
 
+// ============================================================
+// FEATURE 6: FILE DECOMPRESSION
+// ============================================================
+
+bool decompressFile(string inputFile, string outputFile)
+{
+    ifstream compressed(inputFile.c_str(), ios::binary);
+
+    if (!compressed)
+    {
+        cout << "Error: Could not open compressed file." << endl;
+        return false;
+    }
+
+    // ---- Read the frequency table ----
+    int uniqueCharacters = 0;
+
+    compressed.read((char*)&uniqueCharacters, sizeof(uniqueCharacters));
+
+    if (!compressed || uniqueCharacters < 1 || uniqueCharacters > 256)
+    {
+        cout << "Error: Not a valid compressed file." << endl;
+        return false;
+    }
+
+    int frequency[256] = {0};
+
+    for (int i = 0; i < uniqueCharacters; i++)
+    {
+        unsigned char character;
+        int count;
+
+        compressed.read((char*)&character, sizeof(character));
+        compressed.read((char*)&count, sizeof(count));
+
+        frequency[character] = count;
+    }
+
+    long long validBits = 0;
+
+    compressed.read((char*)&validBits, sizeof(validBits));
+
+    if (!compressed)
+    {
+        cout << "Error: Compressed file is damaged." << endl;
+        return false;
+    }
+
+    // ---- Rebuild the Huffman tree ----
+    HuffmanNode* root = buildHuffmanTree(frequency);
+
+    ofstream output(outputFile.c_str(), ios::binary);
+
+    if (!output)
+    {
+        cout << "Error: Could not create decompressed file." << endl;
+        deleteTree(root);
+        return false;
+    }
+
+    // ---- Decode the bits ----
+    if (root->left == NULL && root->right == NULL)
+    {
+        // Only one unique character in the whole file
+        for (long long i = 0; i < validBits; i++)
+        {
+            output.put(root->data);
+        }
+    }
+    else
+    {
+        HuffmanNode* current = root;
+        long long bitsRead = 0;
+        unsigned char byte;
+
+        while (bitsRead < validBits &&
+               compressed.read((char*)&byte, sizeof(byte)))
+        {
+            for (int i = 7; i >= 0 && bitsRead < validBits; i--)
+            {
+                current = (byte & (1 << i)) ? current->right : current->left;
+                bitsRead++;
+
+                if (current->left == NULL && current->right == NULL)
+                {
+                    output.put(current->data);
+                    current = root;
+                }
+            }
+        }
+    }
+
+    compressed.close();
+    output.close();
+    deleteTree(root);
+
+    return true;
+}
 
 
+// ============================================================
+// FEATURE 7 & 8 HELPERS: FILE SIZE + FILE INTEGRITY
+// ============================================================
+
+long long getFileSize(string filename)
+{
+    ifstream file(filename.c_str(), ios::binary | ios::ate);
+
+    if (!file)
+    {
+        return -1;
+    }
+
+    return (long long)file.tellg();
+}
+
+bool checkIntegrity(string originalFile, string decompressedFile)
+{
+    ifstream original(originalFile.c_str(), ios::binary);
+    ifstream decompressed(decompressedFile.c_str(), ios::binary);
+
+    if (!original || !decompressed)
+    {
+        return false;
+    }
+
+    if (getFileSize(originalFile) != getFileSize(decompressedFile))
+    {
+        return false;
+    }
+
+    char a, b;
+
+    while (original.get(a) && decompressed.get(b))
+    {
+        if (a != b)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 
+// ============================================================
+// MENU OPTION 1: COMPRESS
+// ============================================================
+
+void compressOption()
+{
+    string inputFile;
+
+    cout << "\nEnter file to compress (e.g. Ratfiles.txt): ";
+    getline(cin, inputFile);
+
+    string compressedFile = inputFile + ".huf";
+
+    // ---- Read file + frequency analysis ----
+    int frequency[256] = {0};
+
+    if (!readFrequencies(inputFile, frequency))
+    {
+        cout << "Error: " << inputFile << " not found." << endl;
+        return;
+    }
+
+    cout << "\nFile read successfully." << endl;
+
+    displayFrequencies(frequency);
+
+    // ---- Huffman tree + codes ----
+    HuffmanNode* root = buildHuffmanTree(frequency);
+
+    if (root == NULL)
+    {
+        cout << "\nThe file is empty. Nothing to compress." << endl;
+        return;
+    }
+
+    string codes[256];
+
+    createBinaryCodes(root, "", codes);
+    displayBinaryCodes(frequency, codes);
+
+    // ---- Compression ----
+    cout << "\n" << LINE << "\n";
+    cout << "                    COMPRESSION\n";
+    cout << LINE << "\n";
+
+    if (compressFile(inputFile, compressedFile, codes, frequency))
+    {
+        cout << "Compressed file    : " << compressedFile << endl;
+
+        // ---- Compression ratio ----
+        long long originalSize = getFileSize(inputFile);
+        long long compressedSize = getFileSize(compressedFile);
+
+        double saved =
+            ((double)(originalSize - compressedSize) / originalSize) * 100;
+
+        cout << "\n" << DASH << "\n";
+        cout << left << setw(25) << "Original File Size"
+             << ": " << originalSize << " bytes" << endl;
+        cout << left << setw(25) << "Compressed File Size"
+             << ": " << compressedSize << " bytes" << endl;
+        cout << left << setw(25) << "Space Saved"
+             << ": " << fixed << setprecision(2) << saved << "%" << endl;
+
+        if (saved < 0)
+        {
+            cout << "\nNote: this file is too small. The header is bigger "
+                 << "than the savings." << endl;
+        }
+    }
+
+    cout << LINE << "\n";
+
+    deleteTree(root);
+}
 
 
+// ============================================================
+// MENU OPTION 2: DECOMPRESS (+ integrity check)
+// ============================================================
+
+void decompressOption()
+{
+    string compressedFile;
+
+    cout << "\nEnter file to decompress (e.g. Ratfiles.txt.huf): ";
+    getline(cin, compressedFile);
+
+    if (getFileSize(compressedFile) < 0)
+    {
+        cout << "Error: " << compressedFile << " not found." << endl;
+        return;
+    }
+
+    // Original name = compressed name without ".huf"
+    string originalFile = "";
+
+    if (compressedFile.length() > 4 &&
+        compressedFile.substr(compressedFile.length() - 4) == ".huf")
+    {
+        originalFile = compressedFile.substr(0, compressedFile.length() - 4);
+    }
+
+    // Output name = original name + "_decoded" before the extension,
+    // so the original file is never overwritten
+    string outputFile;
+
+    if (originalFile.empty())
+    {
+        outputFile = compressedFile + "_decoded.txt";
+    }
+    else
+    {
+        size_t dot = originalFile.rfind('.');
+
+        if (dot == string::npos)
+        {
+            outputFile = originalFile + "_decoded";
+        }
+        else
+        {
+            outputFile = originalFile.substr(0, dot) + "_decoded" +
+                         originalFile.substr(dot);
+        }
+    }
+
+    cout << "\n" << LINE << "\n";
+    cout << "                   DECOMPRESSION\n";
+    cout << LINE << "\n";
+
+    if (!decompressFile(compressedFile, outputFile))
+    {
+        cout << LINE << "\n";
+        return;
+    }
+
+    cout << "Decompressed file  : " << outputFile << endl;
+    cout << LINE << "\n";
+
+    // ---- File integrity ----
+    if (getFileSize(originalFile) < 0)
+    {
+        cout << "\nEnter the original file to compare with: ";
+        getline(cin, originalFile);
+    }
+
+    cout << "\n" << LINE << "\n";
+    cout << "                    FILE INTEGRITY\n";
+    cout << LINE << "\n";
+
+    if (getFileSize(originalFile) < 0)
+    {
+        cout << "Original file not found. Integrity check skipped." << endl;
+    }
+    else if (checkIntegrity(originalFile, outputFile))
+    {
+        cout << "Original and decompressed files are identical.\n\n";
+        cout << "              FILE INTEGRITY: VERIFIED" << endl;
+    }
+    else
+    {
+        cout << "Original and decompressed files are different.\n\n";
+        cout << "              FILE INTEGRITY: FAILED" << endl;
+    }
+
+    cout << LINE << "\n";
+}
 
 
+// ============================================================
+// MAIN MENU
+// ============================================================
 
+int main()
+{
+    string choice;
 
+    do
+    {
+        cout << "\n" << LINE << "\n";
+        cout << "                 HUFFMAN CODING PROJECT\n";
+        cout << LINE << "\n";
+        cout << "  [1] Compress a file\n";
+        cout << "  [2] Decompress a file\n";
+        cout << "  [3] Exit\n";
+        cout << DASH << "\n";
+        cout << "Enter choice: ";
 
+        getline(cin, choice);
 
+        if (choice == "1")
+        {
+            compressOption();
+        }
+        else if (choice == "2")
+        {
+            decompressOption();
+        }
+        else if (choice == "3")
+        {
+            cout << "\nGoodbye!" << endl;
+        }
+        else
+        {
+            cout << "\nInvalid choice. Please enter 1, 2, or 3." << endl;
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    } while (choice != "3" && cin);
 
     return 0;
 }
