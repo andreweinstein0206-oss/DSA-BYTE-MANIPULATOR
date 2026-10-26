@@ -10,7 +10,7 @@ const string DASH = "-----------------------------------------------------------
 
 
 // ============================================================
-// HUFFMAN NODE
+// NODE
 // ============================================================
 
 struct HuffmanNode
@@ -84,20 +84,18 @@ struct PriorityQueue
 
 
 // ============================================================
-// FEATURE 1 & 2: READ TEXT FILE + CHARACTER FREQUENCY ANALYSIS
+// READ TEXT FILE + CHARACTER FREQUENCY ANALYSIS
 // ============================================================
 
 bool readFrequencies(string filename, int frequency[])
 {
     ifstream file(filename.c_str(), ios::binary);
-
     if (!file)
     {
         return false;
     }
 
     char ch;
-
     while (file.get(ch))
     {
         frequency[(unsigned char)ch]++;
@@ -107,7 +105,7 @@ bool readFrequencies(string filename, int frequency[])
     return true;
 }
 
-// Readable label for a character (used by both tables)
+
 string charLabel(int i)
 {
     if (i == ' ')  return "[SPACE]";
@@ -147,9 +145,7 @@ void displayFrequencies(int frequency[])
 
 
 // ============================================================
-// FEATURE 3: HUFFMAN TREE CONSTRUCTION
-// Used by BOTH compression and decompression, so the two sides
-// always build exactly the same tree.
+// HUFFMAN TREE CONSTRUCTION
 // ============================================================
 
 HuffmanNode* buildHuffmanTree(int frequency[])
@@ -200,7 +196,7 @@ void deleteTree(HuffmanNode* root)
 
 
 // ============================================================
-// FEATURE 4: HUFFMAN CODE GENERATION
+// HUFFMAN CODE GENERATION
 // ============================================================
 
 void createBinaryCodes(HuffmanNode* root, string code, string codes[])
@@ -247,13 +243,7 @@ void displayBinaryCodes(int frequency[], string codes[])
 
 
 // ============================================================
-// FEATURE 5: FILE COMPRESSION
-//
-// Compressed file format:
-//   int         number of unique characters
-//   repeated:   1 byte character + int frequency
-//   long long   number of valid bits
-//   bytes       the Huffman bits packed 8 per byte
+// FILE COMPRESSION
 // ============================================================
 
 bool compressFile(string inputFile, string outputFile,
@@ -275,7 +265,7 @@ bool compressFile(string inputFile, string outputFile,
         return false;
     }
 
-    // ---- Header: frequency table ----
+    // Header: frequency table 
     int uniqueCharacters = 0;
 
     for (int i = 0; i < 256; i++)
@@ -299,7 +289,7 @@ bool compressFile(string inputFile, string outputFile,
         }
     }
 
-    // ---- Convert the text into Huffman bits ----
+    //Convert the text into Huffman bits 
     string bits = "";
     char ch;
 
@@ -338,7 +328,7 @@ bool compressFile(string inputFile, string outputFile,
 
 
 // ============================================================
-// FEATURE 6: FILE DECOMPRESSION
+// FILE DECOMPRESSION
 // ============================================================
 
 bool decompressFile(string inputFile, string outputFile)
@@ -438,7 +428,7 @@ bool decompressFile(string inputFile, string outputFile)
 
 
 // ============================================================
-// FEATURE 7 & 8 HELPERS: FILE SIZE + FILE INTEGRITY
+// FILE SIZE + FILE INTEGRITY
 // ============================================================
 
 long long getFileSize(string filename)
@@ -483,7 +473,7 @@ bool checkIntegrity(string originalFile, string decompressedFile)
 
 
 // ============================================================
-// MENU OPTION 1: COMPRESS
+// FILE COMPRESSION
 // ============================================================
 
 void compressOption()
@@ -495,7 +485,7 @@ void compressOption()
 
     string compressedFile = inputFile + ".huf";
 
-    // ---- Read file + frequency analysis ----
+    //Read file
     int frequency[256] = {0};
 
     if (!readFrequencies(inputFile, frequency))
@@ -508,7 +498,7 @@ void compressOption()
 
     displayFrequencies(frequency);
 
-    // ---- Huffman tree + codes ----
+    // Huffman tree
     HuffmanNode* root = buildHuffmanTree(frequency);
 
     if (root == NULL)
@@ -522,7 +512,7 @@ void compressOption()
     createBinaryCodes(root, "", codes);
     displayBinaryCodes(frequency, codes);
 
-    // ---- Compression ----
+    //Compression 
     cout << "\n" << LINE << "\n";
     cout << "                    COMPRESSION\n";
     cout << LINE << "\n";
@@ -531,7 +521,7 @@ void compressOption()
     {
         cout << "Compressed file    : " << compressedFile << endl;
 
-        // ---- Compression ratio ----
+        //Compression ratio 
         long long originalSize = getFileSize(inputFile);
         long long compressedSize = getFileSize(compressedFile);
 
@@ -560,7 +550,7 @@ void compressOption()
 
 
 // ============================================================
-// MENU OPTION 2: DECOMPRESS (+ integrity check)
+// DECOMPRESS
 // ============================================================
 
 void decompressOption()
@@ -576,7 +566,7 @@ void decompressOption()
         return;
     }
 
-    // Original name = compressed name without ".huf"
+    
     string originalFile = "";
 
     if (compressedFile.length() > 4 &&
@@ -585,7 +575,7 @@ void decompressOption()
         originalFile = compressedFile.substr(0, compressedFile.length() - 4);
     }
 
-    // Output name = original name + "_decoded" before the extension,
+   
     // so the original file is never overwritten
     string outputFile;
 
@@ -621,7 +611,7 @@ void decompressOption()
     cout << "Decompressed file  : " << outputFile << endl;
     cout << LINE << "\n";
 
-    // ---- File integrity ----
+    //File integrity
     if (getFileSize(originalFile) < 0)
     {
         cout << "\nEnter the original file to compare with: ";
